@@ -29,7 +29,7 @@ namespace NoAllyAttackBlock
 
             Log.Init(Logger);
 
-            EnablePassThroughForEnemies = Config.Bind(new ConfigDefinition("General", "Enable Pass-Through For Enemies"), false, new ConfigDescription("Enables the pass-through functionality for enemy attacks"));
+            EnablePassThroughForEnemies = Config.Bind(new ConfigDefinition("General", "Enable Pass-Through For Enemies"), false, new ConfigDescription("If enabled, enemy attacks will pass through other enemies"));
 
             if (RiskOfOptionsCompat.Active)
                 RiskOfOptionsCompat.Run();

@@ -79,8 +79,14 @@ namespace NoAllyAttackBlock
             // Yeah this is a quadruple-nested foreach, what about it?
             foreach (CharacterBody body in CharacterBody.readOnlyInstancesList)
             {
+                if (!body.healthComponent)
+                    continue;
+
                 if (!FriendlyFireManager.ShouldSplashHitProceed(body.healthComponent, projectileTeam))
                 {
+                    if (!body.hurtBoxGroup || body.hurtBoxGroup.hurtBoxes == null)
+                        continue;
+
                     foreach (HurtBox hurtBox in body.hurtBoxGroup.hurtBoxes)
                     {
                         foreach (Collider hurtBoxCollider in hurtBox.GetComponents<Collider>())

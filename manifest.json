@@ -1,0 +1,12 @@
+﻿{
+	"name": "NoAllyAttackBlock",
+	"authorName": "Gorakh",
+	"displayName": "Disable Ally Attack Collision",
+	"version_number": "1.0.0",
+	"website_url": "https://github.com/Goorakh/NoAllyAttackBlock",
+	"description": "Makes attacks not collide with your allies",
+	"dependencies": [
+		"bbepis-BepInExPack-5.4.2100",
+		"RiskofThunder-HookGenPatcher-1.2.1"
+	]
+}

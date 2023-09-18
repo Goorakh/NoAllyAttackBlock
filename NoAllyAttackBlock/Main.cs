@@ -23,6 +23,24 @@ namespace NoAllyAttackBlock
             return EnablePassThroughForEnemies.Value || teamIndex == TeamIndex.Player;
         }
 
+        static bool shouldIgnoreAttackCollision(HurtBox victimHurtBox, GameObject attacker)
+        {
+            if (attacker &&
+                attacker.TryGetComponent(out TeamComponent attackerTeamComponent) &&
+                shouldEnablePassThrough(attackerTeamComponent.teamIndex))
+            {
+                if (victimHurtBox && victimHurtBox.healthComponent)
+                {
+                    if (!FriendlyFireManager.ShouldDirectHitProceed(victimHurtBox.healthComponent, attackerTeamComponent.teamIndex))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         void Awake()
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -43,20 +61,7 @@ namespace NoAllyAttackBlock
 
         static bool BulletAttack_DefaultFilterCallbackImplementation(On.RoR2.BulletAttack.orig_DefaultFilterCallbackImplementation orig, BulletAttack bulletAttack, ref BulletAttack.BulletHit hitInfo)
         {
-            if (orig(bulletAttack, ref hitInfo))
-            {
-                if (bulletAttack.owner &&
-                    bulletAttack.owner.TryGetComponent(out TeamComponent attackerTeamComponent) &&
-                    shouldEnablePassThrough(attackerTeamComponent.teamIndex))
-                {
-                    if (hitInfo.hitHurtBox && hitInfo.hitHurtBox.healthComponent)
-                    {
-                        return FriendlyFireManager.ShouldDirectHitProceed(hitInfo.hitHurtBox.healthComponent, attackerTeamComponent.teamIndex);
-                    }
-                }
-            }
-
-            return false;
+            return orig(bulletAttack, ref hitInfo) && !shouldIgnoreAttackCollision(hitInfo.hitHurtBox, bulletAttack.owner);
         }
 
         static void ProjectileController_Start(On.RoR2.Projectile.ProjectileController.orig_Start orig, ProjectileController self)

@@ -43,19 +43,20 @@ namespace NoAllyAttackBlock
 
         static bool BulletAttack_DefaultFilterCallbackImplementation(On.RoR2.BulletAttack.orig_DefaultFilterCallbackImplementation orig, BulletAttack bulletAttack, ref BulletAttack.BulletHit hitInfo)
         {
-            bool result = orig(bulletAttack, ref hitInfo);
-
-            if (bulletAttack.owner &&
-                bulletAttack.owner.TryGetComponent(out TeamComponent attackerTeamComponent) &&
-                shouldEnablePassThrough(attackerTeamComponent.teamIndex))
+            if (orig(bulletAttack, ref hitInfo))
             {
-                if (hitInfo.hitHurtBox && hitInfo.hitHurtBox.healthComponent)
+                if (bulletAttack.owner &&
+                    bulletAttack.owner.TryGetComponent(out TeamComponent attackerTeamComponent) &&
+                    shouldEnablePassThrough(attackerTeamComponent.teamIndex))
                 {
-                    return result && FriendlyFireManager.ShouldDirectHitProceed(hitInfo.hitHurtBox.healthComponent, attackerTeamComponent.teamIndex);
+                    if (hitInfo.hitHurtBox && hitInfo.hitHurtBox.healthComponent)
+                    {
+                        return FriendlyFireManager.ShouldDirectHitProceed(hitInfo.hitHurtBox.healthComponent, attackerTeamComponent.teamIndex);
+                    }
                 }
             }
 
-            return result;
+            return false;
         }
 
         static void ProjectileController_Start(On.RoR2.Projectile.ProjectileController.orig_Start orig, ProjectileController self)

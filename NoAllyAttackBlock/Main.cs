@@ -94,7 +94,7 @@ namespace NoAllyAttackBlock
                         {
                             foreach (Collider projectileCollider in projectileColliders)
                             {
-                                Physics.IgnoreCollision(projectileCollider, hurtBox.collider, true);
+                                Physics.IgnoreCollision(projectileCollider, hurtBoxCollider, true);
                             }
                         }
                     }

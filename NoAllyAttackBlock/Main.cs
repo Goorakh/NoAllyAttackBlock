@@ -16,7 +16,9 @@ namespace NoAllyAttackBlock
         public const string PluginName = "NoAllyAttackBlock";
         public const string PluginVersion = "1.0.1";
 
-        public static ConfigEntry<bool> EnablePassThroughForEnemies;
+        public static Main Instance { get; private set; }
+
+        public static ConfigEntry<bool> EnablePassThroughForEnemies { get; private set; }
 
         static bool shouldEnablePassThrough(TeamIndex teamIndex)
         {
@@ -45,6 +47,8 @@ namespace NoAllyAttackBlock
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
 
+            Instance = SingletonHelper.Assign(Instance, this);
+
             Log.Init(Logger);
 
             EnablePassThroughForEnemies = Config.Bind(new ConfigDefinition("General", "Enable Pass-Through For Enemies"), false, new ConfigDescription("If enabled, enemy attacks will pass through other enemies"));
@@ -57,6 +61,11 @@ namespace NoAllyAttackBlock
 
             stopwatch.Stop();
             Log.Info_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
+        }
+
+        void OnDestroy()
+        {
+            Instance = SingletonHelper.Unassign(Instance, this);
         }
 
         static bool BulletAttack_DefaultFilterCallbackImplementation(On.RoR2.BulletAttack.orig_DefaultFilterCallbackImplementation orig, BulletAttack bulletAttack, ref BulletAttack.BulletHit hitInfo)

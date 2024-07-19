@@ -1,6 +1,8 @@
 ﻿using BepInEx.Bootstrap;
 using RiskOfOptions;
 using RiskOfOptions.Options;
+using System;
+using System.IO;
 using UnityEngine;
 
 namespace NoAllyAttackBlock
@@ -9,28 +11,39 @@ namespace NoAllyAttackBlock
     {
         public static bool Active => Chainloader.PluginInfos.ContainsKey("com.rune580.riskofoptions");
 
-        static Sprite _icon;
-
         public static void Run()
         {
             const string GUID = Main.PluginGUID;
             const string NAME = "Disable Ally Attack Collision";
 
-            if (!_icon)
+            ModSettingsManager.AddOption(new CheckBoxOption(Main.EnablePassThroughForEnemies), GUID, NAME);
+            
+            FileInfo iconFile = null;
+
+            DirectoryInfo dir = new DirectoryInfo(Path.GetDirectoryName(Main.Instance.Info.Location));
+            do
+            {
+                FileInfo[] files = dir.GetFiles("icon.png", SearchOption.TopDirectoryOnly);
+                if (files != null && files.Length > 0)
+                {
+                    iconFile = files[0];
+                    break;
+                }
+
+                dir = dir.Parent;
+            } while (dir != null && !string.Equals(dir.Name, "plugins", StringComparison.OrdinalIgnoreCase));
+
+            if (iconFile != null)
             {
                 Texture2D iconTexture = new Texture2D(256, 256);
-                if (iconTexture.LoadImage(Properties.Resources.icon))
+                if (iconTexture.LoadImage(File.ReadAllBytes(iconFile.FullName)))
                 {
-                    _icon = Sprite.Create(iconTexture, new Rect(0f, 0f, iconTexture.width, iconTexture.height), Vector2.one / 2f);
+                    Sprite iconSprite = Sprite.Create(iconTexture, new Rect(0f, 0f, iconTexture.width, iconTexture.height), new Vector2(0.5f, 0.5f));
+                    iconSprite.name = $"{Main.PluginName}Icon";
+
+                    ModSettingsManager.SetModIcon(iconSprite, GUID, NAME);
                 }
             }
-
-            if (_icon)
-            {
-                ModSettingsManager.SetModIcon(_icon, GUID, NAME);
-            }
-
-            ModSettingsManager.AddOption(new CheckBoxOption(Main.EnablePassThroughForEnemies), GUID, NAME);
         }
     }
 }

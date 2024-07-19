@@ -65,6 +65,9 @@ namespace NoAllyAttackBlock
 
         void OnDestroy()
         {
+            On.RoR2.BulletAttack.DefaultFilterCallbackImplementation -= BulletAttack_DefaultFilterCallbackImplementation;
+            On.RoR2.Projectile.ProjectileController.Start -= ProjectileController_Start;
+
             Instance = SingletonHelper.Unassign(Instance, this);
         }
 

@@ -17,7 +17,7 @@ namespace NoAllyAttackBlock
             const string NAME = "Disable Ally Attack Collision";
 
             ModSettingsManager.AddOption(new CheckBoxOption(Main.EnablePassThroughForEnemies), GUID, NAME);
-            
+
             FileInfo iconFile = null;
 
             DirectoryInfo dir = new DirectoryInfo(Path.GetDirectoryName(Main.Instance.Info.Location));

@@ -14,12 +14,12 @@ namespace NoAllyAttackBlock
 
         static string getLogPrefix(string callerPath, string callerMemberName, int callerLineNumber)
         {
-            const string MOD_NAME = nameof(NoAllyAttackBlock);
+            const string MOD_NAME = nameof(NoAllyAttackBlock) + @"\";
 
             int modNameLastPathIndex = callerPath.LastIndexOf(MOD_NAME);
             if (modNameLastPathIndex >= 0)
             {
-                callerPath = callerPath.Substring(modNameLastPathIndex + MOD_NAME.Length + 1);
+                callerPath = callerPath.Substring(modNameLastPathIndex + MOD_NAME.Length);
             }
 
             return $"{callerPath}:{callerLineNumber} ({callerMemberName}) ";

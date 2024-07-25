@@ -64,7 +64,7 @@ namespace NoAllyAttackBlock
             On.RoR2.Projectile.ProjectileController.Awake += ProjectileController_Awake;
 
             stopwatch.Stop();
-            Log.Info_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
+            Log.Message_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
         }
 
         void OnDestroy()

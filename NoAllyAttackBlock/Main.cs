@@ -21,24 +21,32 @@ namespace NoAllyAttackBlock
 
         public static ConfigEntry<bool> EnablePassThroughForEnemies { get; private set; }
 
-        public static bool ShouldEnablePassThrough(CharacterBody attacker)
-        {
-            return EnablePassThroughForEnemies.Value || (attacker && (attacker.isPlayerControlled || attacker.teamComponent.teamIndex == TeamIndex.Player));
-        }
+        public static ParsedBodyListConfig IgnoreAttackers { get; private set; }
+
+        public static ParsedBodyListConfig IgnoreVictims { get; private set; }
 
         public static bool ShouldIgnoreAttackCollision(HealthComponent victim, GameObject attacker)
         {
             if (!victim || !attacker)
                 return false;
 
-            bool passThroughEnabled = true;
             if (attacker.TryGetComponent(out CharacterBody attackerBody))
             {
-                passThroughEnabled = ShouldEnablePassThrough(attackerBody);
+                if (IgnoreAttackers.Contains(attackerBody.bodyIndex))
+                    return false;
+
+                if (!attackerBody.isPlayerControlled && attackerBody.teamComponent.teamIndex != TeamIndex.Player)
+                {
+                    if (!EnablePassThroughForEnemies.Value)
+                        return false;
+                }
             }
 
-            if (!passThroughEnabled)
-                return false;
+            if (victim.body)
+            {
+                if (IgnoreVictims.Contains(victim.body.bodyIndex))
+                    return false;
+            }
 
             TeamIndex attackerTeam = TeamComponent.GetObjectTeam(attacker);
             if (attackerTeam == TeamIndex.None || FriendlyFireManager.ShouldDirectHitProceed(victim, attackerTeam))
@@ -57,6 +65,12 @@ namespace NoAllyAttackBlock
 
             EnablePassThroughForEnemies = Config.Bind(new ConfigDefinition("General", "Enable Pass-Through For Enemies"), false, new ConfigDescription("If enabled, enemy attacks will pass through other enemies"));
 
+            ConfigEntry<string> ignoreAttackersConfig = Config.Bind(new ConfigDefinition("General", "Exclude Projectiles From"), "", new ConfigDescription("A comma-separated list of characters to exclude from the mod. Any attack owned by one of these characters will not ignore collisions with allies. Both internal and English display names are accepted, with whitespace and commas removed."));
+            IgnoreAttackers = new ParsedBodyListConfig(ignoreAttackersConfig);
+
+            ConfigEntry<string> ignoreVictimsConfig = Config.Bind(new ConfigDefinition("General", "Never Ignore Collisions With"), "", new ConfigDescription("A comma-separated list of characters to never ignore collisions with. Any character in this list will always have collision with incoming ally attacks. Both internal and English display names are accepted, with whitespace and commas removed."));
+            IgnoreVictims = new ParsedBodyListConfig(ignoreVictimsConfig);
+
             if (RiskOfOptionsCompat.Active)
                 RiskOfOptionsCompat.Run();
 
@@ -71,6 +85,9 @@ namespace NoAllyAttackBlock
         {
             On.RoR2.BulletAttack.DefaultFilterCallbackImplementation -= BulletAttack_DefaultFilterCallbackImplementation;
             On.RoR2.Projectile.ProjectileController.Awake -= ProjectileController_Awake;
+
+            IgnoreAttackers.Dispose();
+            IgnoreVictims.Dispose();
 
             Instance = SingletonHelper.Unassign(Instance, this);
         }

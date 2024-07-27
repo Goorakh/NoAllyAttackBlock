@@ -33,6 +33,8 @@ namespace NoAllyAttackBlock
             TeamComponent.onJoinTeamGlobal += onJoinTeamGlobal;
 
             Main.EnablePassThroughForEnemies.SettingChanged += EnablePassThroughForEnemies_SettingChanged;
+            Main.IgnoreAttackers.OnValueChanged += IgnoreAttackers_OnValueChanged;
+            Main.IgnoreVictims.OnValueChanged += IgnoreVictims_OnValueChanged;
         }
 
         void OnDestroy()
@@ -41,6 +43,8 @@ namespace NoAllyAttackBlock
             TeamComponent.onJoinTeamGlobal -= onJoinTeamGlobal;
 
             Main.EnablePassThroughForEnemies.SettingChanged -= EnablePassThroughForEnemies_SettingChanged;
+            Main.IgnoreAttackers.OnValueChanged -= IgnoreAttackers_OnValueChanged;
+            Main.IgnoreVictims.OnValueChanged -= IgnoreVictims_OnValueChanged;
         }
 
         void FixedUpdate()
@@ -63,6 +67,16 @@ namespace NoAllyAttackBlock
         }
 
         void EnablePassThroughForEnemies_SettingChanged(object sender, EventArgs e)
+        {
+            updateAllCharacterCollisions();
+        }
+
+        void IgnoreVictims_OnValueChanged()
+        {
+            updateAllCharacterCollisions();
+        }
+
+        void IgnoreAttackers_OnValueChanged()
         {
             updateAllCharacterCollisions();
         }

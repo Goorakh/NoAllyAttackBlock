@@ -1,5 +1,6 @@
 ﻿using BepInEx.Bootstrap;
 using RiskOfOptions;
+using RiskOfOptions.OptionConfigs;
 using RiskOfOptions.Options;
 using System;
 using System.IO;
@@ -17,6 +18,16 @@ namespace NoAllyAttackBlock
             const string NAME = "Disable Ally Attack Collision";
 
             ModSettingsManager.AddOption(new CheckBoxOption(Main.EnablePassThroughForEnemies), GUID, NAME);
+
+            ModSettingsManager.AddOption(new StringInputFieldOption(Main.IgnoreAttackers.Config, new InputFieldConfig
+            {
+                submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit
+            }), GUID, NAME);
+
+            ModSettingsManager.AddOption(new StringInputFieldOption(Main.IgnoreVictims.Config, new InputFieldConfig
+            {
+                submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit
+            }), GUID, NAME);
 
             FileInfo iconFile = null;
 

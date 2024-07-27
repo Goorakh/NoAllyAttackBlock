@@ -109,7 +109,7 @@ namespace NoAllyAttackBlock
                 }
                 else
                 {
-                    Log.Warning($"Failed to find character matching '{splitInput[i]}'");
+                    Log.Warning($"Failed to find character matching '{splitInput[i]}' for '{Config.Definition}'");
                 }
             }
 
@@ -117,7 +117,7 @@ namespace NoAllyAttackBlock
             Array.Sort(_parsedArray, Comparer);
 
 #if DEBUG
-            Log.Debug($"Parsed body list value ({Config.Definition.Key}): [{string.Join(", ", _parsedArray.Select(BodyCatalog.GetBodyName))}]");
+            Log.Debug($"Parsed body list value ({Config.Definition}): [{string.Join(", ", _parsedArray.Select(BodyCatalog.GetBodyName))}]");
 #endif
 
             OnValueChanged?.Invoke();
@@ -131,33 +131,48 @@ namespace NoAllyAttackBlock
 
             bool checkName(string name)
             {
-                StringBuilder sb = HG.StringBuilderPool.RentStringBuilder();
+                StringBuilder filteredNameBuilder = HG.StringBuilderPool.RentStringBuilder();
+                StringBuilder asciiOnlyNameBuilder = HG.StringBuilderPool.RentStringBuilder();
+                StringBuilder alphaNumericOnlyNameBuilder = HG.StringBuilderPool.RentStringBuilder();
 
                 for (int i = 0; i < name.Length; i++)
                 {
                     if (char.IsWhiteSpace(name[i]) || name[i] == ',')
                         continue;
 
-                    sb.Append(name[i]);
+                    filteredNameBuilder.Append(name[i]);
+
+                    if (name[i] <= 0x7F)
+                    {
+                        asciiOnlyNameBuilder.Append(name[i]);
+                    }
+
+                    if (char.IsLetterOrDigit(name[i]))
+                    {
+                        alphaNumericOnlyNameBuilder.Append(name[i]);
+                    }
                 }
 
-                if (sb.Length != name.Length)
-                {
-                    name = sb.ToString();
-                }
+                string filteredName = filteredNameBuilder.ToString();
+                string asciiOnlyName = asciiOnlyNameBuilder.ToString();
+                string alphaNumericName = alphaNumericOnlyNameBuilder.ToString();
 
-                HG.StringBuilderPool.ReturnStringBuilder(sb);
+                HG.StringBuilderPool.ReturnStringBuilder(alphaNumericOnlyNameBuilder);
+                HG.StringBuilderPool.ReturnStringBuilder(asciiOnlyNameBuilder);
+                HG.StringBuilderPool.ReturnStringBuilder(filteredNameBuilder);
 
-                return string.Equals(name, input, StringComparison.OrdinalIgnoreCase);
+                return string.Equals(filteredName, input, StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(asciiOnlyName, input, StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(alphaNumericName, input, StringComparison.OrdinalIgnoreCase);
             }
 
             foreach (CharacterBody body in BodyCatalog.allBodyPrefabBodyBodyComponents)
             {
                 string bodyName = body.name;
                 if (checkName(bodyName) ||
-                    bodyName.EndsWith("body", StringComparison.OrdinalIgnoreCase) && checkName(bodyName.Remove(bodyName.Length - 4)) ||
+                    (bodyName.EndsWith("body", StringComparison.OrdinalIgnoreCase) && checkName(bodyName.Remove(bodyName.Length - 4))) ||
                     checkName(body.baseNameToken) ||
-                    !Language.IsTokenInvalid(body.baseNameToken) && checkName(Language.english.GetLocalizedStringByToken(body.baseNameToken)))
+                    (!Language.IsTokenInvalid(body.baseNameToken) && checkName(Language.english.GetLocalizedStringByToken(body.baseNameToken))))
                 {
                     bodyIndex = body.bodyIndex;
                     return true;

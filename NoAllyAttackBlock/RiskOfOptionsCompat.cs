@@ -19,6 +19,8 @@ namespace NoAllyAttackBlock
 
             ModSettingsManager.AddOption(new CheckBoxOption(Main.EnablePassThroughForEnemies), GUID, NAME);
 
+            ModSettingsManager.AddOption(new CheckBoxOption(Main.IgnoreStickProjectiles), GUID, NAME);
+
             ModSettingsManager.AddOption(new StringInputFieldOption(Main.IgnoreAttackers.Config, new InputFieldConfig
             {
                 submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit

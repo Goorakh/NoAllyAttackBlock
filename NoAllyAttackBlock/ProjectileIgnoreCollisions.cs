@@ -9,6 +9,7 @@ namespace NoAllyAttackBlock
     public class ProjectileIgnoreCollisions : MonoBehaviour
     {
         ProjectileController _projectileController;
+        ProjectileStickOnImpact _projectileStickOnImpact;
 
         readonly HashSet<CharacterBody> _ignoringCollisionsWith = [];
 
@@ -17,6 +18,7 @@ namespace NoAllyAttackBlock
         void Awake()
         {
             _projectileController = GetComponent<ProjectileController>();
+            _projectileStickOnImpact = GetComponent<ProjectileStickOnImpact>();
         }
 
         void Start()
@@ -33,16 +35,18 @@ namespace NoAllyAttackBlock
             TeamComponent.onJoinTeamGlobal += onJoinTeamGlobal;
 
             Main.EnablePassThroughForEnemies.SettingChanged += EnablePassThroughForEnemies_SettingChanged;
+            Main.IgnoreStickProjectiles.SettingChanged += IgnoreStickProjectiles_SettingChanged;
             Main.IgnoreAttackers.OnValueChanged += IgnoreAttackers_OnValueChanged;
             Main.IgnoreVictims.OnValueChanged += IgnoreVictims_OnValueChanged;
         }
 
-        void OnDestroy()
+        void OnDisable()
         {
             CharacterBody.onBodyStartGlobal -= updateIgnoreCollisions;
             TeamComponent.onJoinTeamGlobal -= onJoinTeamGlobal;
 
             Main.EnablePassThroughForEnemies.SettingChanged -= EnablePassThroughForEnemies_SettingChanged;
+            Main.IgnoreStickProjectiles.SettingChanged -= IgnoreStickProjectiles_SettingChanged;
             Main.IgnoreAttackers.OnValueChanged -= IgnoreAttackers_OnValueChanged;
             Main.IgnoreVictims.OnValueChanged -= IgnoreVictims_OnValueChanged;
         }
@@ -67,6 +71,11 @@ namespace NoAllyAttackBlock
         }
 
         void EnablePassThroughForEnemies_SettingChanged(object sender, EventArgs e)
+        {
+            updateAllCharacterCollisions();
+        }
+
+        void IgnoreStickProjectiles_SettingChanged(object sender, EventArgs e)
         {
             updateAllCharacterCollisions();
         }
@@ -107,6 +116,12 @@ namespace NoAllyAttackBlock
                 return;
 
             bool shouldIgnore = Main.ShouldIgnoreAttackCollision(body.healthComponent, _projectileController.owner);
+
+            if (Main.IgnoreStickProjectiles.Value && _projectileStickOnImpact && !_projectileStickOnImpact.ignoreCharacters)
+            {
+                shouldIgnore = false;
+            }
+
             setIgnoreCollisions(body, shouldIgnore);
         }
 

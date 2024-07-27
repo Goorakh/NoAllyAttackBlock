@@ -21,6 +21,8 @@ namespace NoAllyAttackBlock
 
         public static ConfigEntry<bool> EnablePassThroughForEnemies { get; private set; }
 
+        public static ConfigEntry<bool> IgnoreStickProjectiles { get; private set; }
+
         public static ParsedBodyListConfig IgnoreAttackers { get; private set; }
 
         public static ParsedBodyListConfig IgnoreVictims { get; private set; }
@@ -64,6 +66,8 @@ namespace NoAllyAttackBlock
             Log.Init(Logger);
 
             EnablePassThroughForEnemies = Config.Bind(new ConfigDefinition("General", "Enable Pass-Through For Enemies"), false, new ConfigDescription("If enabled, enemy attacks will pass through other enemies"));
+
+            IgnoreStickProjectiles = Config.Bind(new ConfigDefinition("General", "Exclude Sticking Projectiles"), false, new ConfigDescription("If enabled, projectiles that can stick to characters (loader grapple, engi spider mines, etc.) will always have collision enabled"));
 
             ConfigEntry<string> ignoreAttackersConfig = Config.Bind(new ConfigDefinition("General", "Exclude Projectiles From"), "", new ConfigDescription("A comma-separated list of characters to exclude from the mod. Any attack owned by one of these characters will not ignore collisions with allies. Both internal and English display names are accepted, with whitespace and commas removed."));
             IgnoreAttackers = new ParsedBodyListConfig(ignoreAttackersConfig);

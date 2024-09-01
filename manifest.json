@@ -7,6 +7,6 @@
 	"description": "Makes attacks not collide with your allies",
 	"dependencies": [
 		"bbepis-BepInExPack-5.4.2100",
-		"RiskofThunder-HookGenPatcher-1.2.1"
+		"RiskofThunder-HookGenPatcher-1.2.4"
 	]
 }

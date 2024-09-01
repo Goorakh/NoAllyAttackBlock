@@ -1,3 +1,7 @@
+**?.?.? Changes:**
+
+* Fixed for SotS
+
 **1.1.0 Changes:**
 
 * Added config options to prevent the mod from disabling attack collisions with/from specific characters

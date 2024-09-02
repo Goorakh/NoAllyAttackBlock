@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NoAllyAttackBlock
+namespace NoAllyAttackBlock.Utils
 {
     public static class ArrayUtil
     {

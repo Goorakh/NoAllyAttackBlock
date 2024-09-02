@@ -1,8 +1,7 @@
 using BepInEx;
 using BepInEx.Configuration;
+using NoAllyAttackBlock.Utils;
 using RoR2;
-using RoR2.Projectile;
-using System;
 using System.Diagnostics;
 using UnityEngine;
 
@@ -10,14 +9,14 @@ namespace NoAllyAttackBlock
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
     [BepInDependency("com.rune580.riskofoptions", BepInDependency.DependencyFlags.SoftDependency)]
-    public class Main : BaseUnityPlugin
+    public class NoAllyAttackBlockPlugin : BaseUnityPlugin
     {
         public const string PluginGUID = PluginAuthor + "." + PluginName;
         public const string PluginAuthor = "Gorakh";
         public const string PluginName = "NoAllyAttackBlock";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
-        public static Main Instance { get; private set; }
+        public static NoAllyAttackBlockPlugin Instance { get; private set; }
 
         public static ConfigEntry<bool> EnablePassThroughForEnemies { get; private set; }
 
@@ -78,46 +77,16 @@ namespace NoAllyAttackBlock
             if (RiskOfOptionsCompat.Active)
                 RiskOfOptionsCompat.Run();
 
-            On.RoR2.BulletAttack.DefaultFilterCallbackImplementation += BulletAttack_DefaultFilterCallbackImplementation;
-            On.RoR2.Projectile.ProjectileController.Awake += ProjectileController_Awake;
-
             stopwatch.Stop();
             Log.Message_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
         }
 
         void OnDestroy()
         {
-            On.RoR2.BulletAttack.DefaultFilterCallbackImplementation -= BulletAttack_DefaultFilterCallbackImplementation;
-            On.RoR2.Projectile.ProjectileController.Awake -= ProjectileController_Awake;
-
             IgnoreAttackers.Dispose();
             IgnoreVictims.Dispose();
 
             Instance = SingletonHelper.Unassign(Instance, this);
-        }
-
-        static bool BulletAttack_DefaultFilterCallbackImplementation(On.RoR2.BulletAttack.orig_DefaultFilterCallbackImplementation orig, BulletAttack bulletAttack, ref BulletAttack.BulletHit hitInfo)
-        {
-            bool result = orig(bulletAttack, ref hitInfo);
-
-            try
-            {
-                if (ShouldIgnoreAttackCollision(hitInfo.hitHurtBox?.healthComponent, bulletAttack.owner))
-                    return false;
-            }
-            catch (Exception e)
-            {
-                Log.Error_NoCallerPrefix(e);
-            }
-
-            return result;
-        }
-
-        static void ProjectileController_Awake(On.RoR2.Projectile.ProjectileController.orig_Awake orig, ProjectileController self)
-        {
-            orig(self);
-
-            self.gameObject.AddComponent<ProjectileIgnoreCollisions>();
         }
     }
 }

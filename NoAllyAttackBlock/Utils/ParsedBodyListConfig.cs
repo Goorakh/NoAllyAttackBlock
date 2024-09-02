@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace NoAllyAttackBlock
+namespace NoAllyAttackBlock.Utils
 {
     public class ParsedBodyListConfig : IReadOnlyList<BodyIndex>, IDisposable
     {
@@ -170,9 +170,9 @@ namespace NoAllyAttackBlock
             {
                 string bodyName = body.name;
                 if (checkName(bodyName) ||
-                    (bodyName.EndsWith("body", StringComparison.OrdinalIgnoreCase) && checkName(bodyName.Remove(bodyName.Length - 4))) ||
+                    bodyName.EndsWith("body", StringComparison.OrdinalIgnoreCase) && checkName(bodyName.Remove(bodyName.Length - 4)) ||
                     checkName(body.baseNameToken) ||
-                    (!Language.IsTokenInvalid(body.baseNameToken) && checkName(Language.english.GetLocalizedStringByToken(body.baseNameToken))))
+                    !Language.IsTokenInvalid(body.baseNameToken) && checkName(Language.english.GetLocalizedStringByToken(body.baseNameToken)))
                 {
                     bodyIndex = body.bodyIndex;
                     return true;

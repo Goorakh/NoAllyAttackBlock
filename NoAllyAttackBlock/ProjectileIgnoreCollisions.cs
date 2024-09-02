@@ -1,4 +1,5 @@
-﻿using RoR2;
+﻿using NoAllyAttackBlock.Utils;
+using RoR2;
 using RoR2.Projectile;
 using System;
 using System.Collections.Generic;
@@ -34,10 +35,10 @@ namespace NoAllyAttackBlock
             CharacterBody.onBodyStartGlobal += updateIgnoreCollisions;
             TeamComponent.onJoinTeamGlobal += onJoinTeamGlobal;
 
-            Main.EnablePassThroughForEnemies.SettingChanged += EnablePassThroughForEnemies_SettingChanged;
-            Main.IgnoreStickProjectiles.SettingChanged += IgnoreStickProjectiles_SettingChanged;
-            Main.IgnoreAttackers.OnValueChanged += IgnoreAttackers_OnValueChanged;
-            Main.IgnoreVictims.OnValueChanged += IgnoreVictims_OnValueChanged;
+            NoAllyAttackBlockPlugin.EnablePassThroughForEnemies.SettingChanged += EnablePassThroughForEnemies_SettingChanged;
+            NoAllyAttackBlockPlugin.IgnoreStickProjectiles.SettingChanged += IgnoreStickProjectiles_SettingChanged;
+            NoAllyAttackBlockPlugin.IgnoreAttackers.OnValueChanged += updateAllCharacterCollisions;
+            NoAllyAttackBlockPlugin.IgnoreVictims.OnValueChanged += updateAllCharacterCollisions;
         }
 
         void OnDisable()
@@ -45,10 +46,10 @@ namespace NoAllyAttackBlock
             CharacterBody.onBodyStartGlobal -= updateIgnoreCollisions;
             TeamComponent.onJoinTeamGlobal -= onJoinTeamGlobal;
 
-            Main.EnablePassThroughForEnemies.SettingChanged -= EnablePassThroughForEnemies_SettingChanged;
-            Main.IgnoreStickProjectiles.SettingChanged -= IgnoreStickProjectiles_SettingChanged;
-            Main.IgnoreAttackers.OnValueChanged -= IgnoreAttackers_OnValueChanged;
-            Main.IgnoreVictims.OnValueChanged -= IgnoreVictims_OnValueChanged;
+            NoAllyAttackBlockPlugin.EnablePassThroughForEnemies.SettingChanged -= EnablePassThroughForEnemies_SettingChanged;
+            NoAllyAttackBlockPlugin.IgnoreStickProjectiles.SettingChanged -= IgnoreStickProjectiles_SettingChanged;
+            NoAllyAttackBlockPlugin.IgnoreAttackers.OnValueChanged -= updateAllCharacterCollisions;
+            NoAllyAttackBlockPlugin.IgnoreVictims.OnValueChanged -= updateAllCharacterCollisions;
         }
 
         void FixedUpdate()
@@ -80,23 +81,9 @@ namespace NoAllyAttackBlock
             updateAllCharacterCollisions();
         }
 
-        void IgnoreVictims_OnValueChanged()
-        {
-            updateAllCharacterCollisions();
-        }
-
-        void IgnoreAttackers_OnValueChanged()
-        {
-            updateAllCharacterCollisions();
-        }
-
         void onJoinTeamGlobal(TeamComponent teamComponent, TeamIndex newTeam)
         {
-            CharacterBody body = teamComponent.body;
-            if (!body)
-                return;
-
-            updateIgnoreCollisions(body);
+            updateIgnoreCollisions(teamComponent.body);
         }
 
         void updateAllCharacterCollisions()
@@ -112,12 +99,13 @@ namespace NoAllyAttackBlock
             if (!body || !body.healthComponent || !_projectileController || !_projectileController.owner)
                 return;
 
+            // ProjectileController already handles collision with owner
             if (body.gameObject == _projectileController.owner)
                 return;
 
-            bool shouldIgnore = Main.ShouldIgnoreAttackCollision(body.healthComponent, _projectileController.owner);
+            bool shouldIgnore = NoAllyAttackBlockPlugin.ShouldIgnoreAttackCollision(body.healthComponent, _projectileController.owner);
 
-            if (Main.IgnoreStickProjectiles.Value && _projectileStickOnImpact && !_projectileStickOnImpact.ignoreCharacters)
+            if (NoAllyAttackBlockPlugin.IgnoreStickProjectiles.Value && _projectileStickOnImpact && !_projectileStickOnImpact.ignoreCharacters)
             {
                 shouldIgnore = false;
             }

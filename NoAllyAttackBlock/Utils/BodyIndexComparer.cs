@@ -1,7 +1,7 @@
 ﻿using RoR2;
 using System.Collections.Generic;
 
-namespace NoAllyAttackBlock
+namespace NoAllyAttackBlock.Utils
 {
     public class BodyIndexComparer : IComparer<BodyIndex>
     {

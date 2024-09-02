@@ -1,6 +1,8 @@
-**?.?.? Changes:**
+**1.2.0 Changes:**
 
-* Fixed for SotS
+* Update for SotS
+
+* Fixed certain enemy attacks not being able to ignore ally collisions
 
 **1.1.0 Changes:**
 

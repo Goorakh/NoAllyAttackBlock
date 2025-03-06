@@ -159,9 +159,7 @@ namespace NoAllyAttackBlock
                     }
                 }
 
-#if DEBUG
                 Log.Debug($"{name} ({_projectileController.netId}) {(ignore ? "disabled" : "enabled")} collision with {Util.GetBestBodyName(body.gameObject)} ({body.netId})");
-#endif
             }
         }
     }

@@ -116,9 +116,7 @@ namespace NoAllyAttackBlock.Utils
             _parsedArray = parsedArray.ToArray();
             Array.Sort(_parsedArray, Comparer);
 
-#if DEBUG
             Log.Debug($"Parsed body list value ({Config.Definition}): [{string.Join(", ", _parsedArray.Select(BodyCatalog.GetBodyName))}]");
-#endif
 
             OnValueChanged?.Invoke();
         }

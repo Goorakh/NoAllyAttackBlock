@@ -38,7 +38,7 @@ namespace NoAllyAttackBlock.Patches
 
         static void tryRemoveIgnoredRaycastHits(GameObject bodyObject, RaycastHit[] hits, ref int hitsLength)
         {
-            if (!bodyObject || !raycastHookEnabled)
+            if (!bodyObject || hits == null || hits.Length == 0 || !raycastHookEnabled)
                 return;
 
             int numRemovedHits = 0;

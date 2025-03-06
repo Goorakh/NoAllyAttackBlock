@@ -1,4 +1,4 @@
-**-.-.- Changes:**
+**1.2.1 Changes:**
 
 * Fixed for SotS phase 2 patch
 

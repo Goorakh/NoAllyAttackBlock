@@ -9,6 +9,19 @@ namespace NoAllyAttackBlock
 {
     public class ProjectileIgnoreCollisions : MonoBehaviour
     {
+        [SystemInitializer(typeof(ProjectileCatalog))]
+        static void Init()
+        {
+            for (int i = 0; i < ProjectileCatalog.projectilePrefabCount; i++)
+            {
+                GameObject projectilePrefab = ProjectileCatalog.GetProjectilePrefab(i);
+                if (projectilePrefab)
+                {
+                    projectilePrefab.AddComponent<ProjectileIgnoreCollisions>();
+                }
+            }
+        }
+
         ProjectileController _projectileController;
         ProjectileStickOnImpact _projectileStickOnImpact;
 

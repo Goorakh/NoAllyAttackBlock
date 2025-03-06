@@ -1,3 +1,7 @@
+**-.-.- Changes:**
+
+* Fixed for SotS phase 2 patch
+
 **1.2.0 Changes:**
 
 * Update for SotS

@@ -2,10 +2,15 @@
 using HarmonyLib;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
-using Mono.Cecil.Rocks;
 using MonoMod.Cil;
+using MonoMod.RuntimeDetour;
+using MonoMod.Utils;
+using NoAllyAttackBlock.Utils;
+using NoAllyAttackBlock.Utils.Extensions;
 using RoR2;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using UnityEngine;
 
@@ -18,243 +23,263 @@ namespace NoAllyAttackBlock.Patches
         [SystemInitializer]
         static void Init()
         {
-            MethodInfo Physics_Raycast_Ray_RaycastHit_float_int_QueryTriggerInteraction = typeof(Physics).GetMethod(nameof(Physics.Raycast), [typeof(Ray), typeof(RaycastHit).MakeByRefType(), typeof(float), typeof(int), typeof(QueryTriggerInteraction)]);
-            if (Physics_Raycast_Ray_RaycastHit_float_int_QueryTriggerInteraction != null)
-            {
-                // UnityEngine.Physics.Raycast(Ray, out RaycastHit, float, int, QueryTriggerInteraction):
-                // EntityStates.Halcyonite.WhirlwindRush.HandleIdentifySafePathForward
-                // EntityStates.HermitCrab.FireMortar.Fire
-                // EntityStates.MiniMushroom.SporeGrenade.FireGrenade
-                // EntityStates.Scorchling.ScorchlingLavaBomb.Spit
-
-                ILContext.Manipulator replaceRaycastManipulator = getReplaceRaycastManipulator(Physics_Raycast_Ray_RaycastHit_float_int_QueryTriggerInteraction);
-
-                IL.EntityStates.Halcyonite.WhirlwindRush.HandleIdentifySafePathForward += replaceRaycastManipulator;
-                IL.EntityStates.HermitCrab.FireMortar.Fire += replaceRaycastManipulator;
-                IL.EntityStates.MiniMushroom.SporeGrenade.FireGrenade += replaceRaycastManipulator;
-                IL.EntityStates.Scorchling.ScorchlingLavaBomb.Spit += replaceRaycastManipulator;
-            }
-            else
-            {
-                Log.Error("Failed to find method UnityEngine.Physics.Raycast(Ray, out RaycastHit, float, int, QueryTriggerInteraction)");
-            }
-
-            MethodInfo Physics_Raycast_Ray_RaycastHit_float_int = typeof(Physics).GetMethod(nameof(Physics.Raycast), [typeof(Ray), typeof(RaycastHit).MakeByRefType(), typeof(float), typeof(int)]);
-            if (Physics_Raycast_Ray_RaycastHit_float_int != null)
-            {
-                // UnityEngine.Physics.Raycast(Ray, out RaycastHit, float, int):
-                // EntityStates.Commando.CommandoWeapon.FireShrapnel.OnEnter
-                // EntityStates.Drone.DroneWeapon.FireTwinRocket.FireProjectile
-                // EntityStates.FalseSon.LaserFatherBurst.FireBurstLaser
-                // EntityStates.FalseSonBoss.LunarGazeCharge.Update
-                // EntityStates.GolemMonster.ChargeLaser.Update
-                // EntityStates.GolemMonster.FireLaser.OnEnter
-                // EntityStates.Halcyonite.ChargeTriLaser.Update
-                // EntityStates.Halcyonite.TriLaser.FireTriLaser
-                // EntityStates.TitanMonster.ChargeMegaLaser.Update
-
-                ILContext.Manipulator replaceRaycastManipulator = getReplaceRaycastManipulator(Physics_Raycast_Ray_RaycastHit_float_int);
-
-                IL.EntityStates.Commando.CommandoWeapon.FireShrapnel.OnEnter += replaceRaycastManipulator;
-                IL.EntityStates.Drone.DroneWeapon.FireTwinRocket.FireProjectile += replaceRaycastManipulator;
-                IL.EntityStates.FalseSon.LaserFatherBurst.FireBurstLaser += replaceRaycastManipulator;
-                IL.EntityStates.FalseSonBoss.LunarGazeCharge.Update += replaceRaycastManipulator;
-                IL.EntityStates.GolemMonster.ChargeLaser.Update += replaceRaycastManipulator;
-                IL.EntityStates.GolemMonster.FireLaser.OnEnter += replaceRaycastManipulator;
-                IL.EntityStates.Halcyonite.ChargeTriLaser.Update += replaceRaycastManipulator;
-                IL.EntityStates.Halcyonite.TriLaser.FireTriLaser += replaceRaycastManipulator;
-                IL.EntityStates.TitanMonster.ChargeMegaLaser.Update += replaceRaycastManipulator;
-            }
-            else
-            {
-                Log.Error("Failed to find method UnityEngine.Physics.Raycast(Ray, out RaycastHit, float, int)");
-            }
+            // EntityStateCatalog does not have a SystemInitializer, so it can't be used as a dependency for our initializer
+            RoR2Application.onLoad = (Action)Delegate.Combine(RoR2Application.onLoad, onLoad);
         }
 
-        static ILContext.Manipulator getReplaceRaycastManipulator(MethodInfo raycastMethod)
+        static void onLoad()
         {
-            void manipulator(ILContext il)
+            Log.Debug($"Collecting state types");
+
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            HashSet<Type> allEntityStateTypes = new HashSet<Type>(EntityStateCatalog.stateIndexToType.Length);
+
+            for (int i = 0; i < EntityStateCatalog.stateIndexToType.Length; i++)
             {
-                ILCursor c = new ILCursor(il);
+                Type stateType = EntityStateCatalog.stateIndexToType[i];
+                while (stateType != null && typeof(EntityState).IsAssignableFrom(stateType) && allEntityStateTypes.Add(stateType))
+                {
+                    stateType = stateType.BaseType;
+                }
+            }
 
-                int patchCount = 0;
+            Log.Debug($"Found {allEntityStateTypes.Count} state type(s) ({stopwatch.Elapsed.TotalMilliseconds:F0}ms)");
+            stopwatch.Restart();
 
-                Mono.Collections.Generic.Collection<VariableDefinition> localVariables = il.Method.Body.Variables;
+            int numAppliedHooks = 0;
+
+            foreach (Type stateType in allEntityStateTypes)
+            {
+                foreach (MethodInfo method in stateType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                {
+                    if (method.IsGenericMethod || !method.HasMethodBody())
+                        continue;
+
+                    ILHook hook = null;
+                    try
+                    {
+                        using DynamicMethodDefinition dmd = new DynamicMethodDefinition(method);
+                        using ILContext il = new ILContext(dmd.Definition);
+                        ILCursor c = new ILCursor(il);
+
+                        if (c.TryGotoNext(matchRaycastMethodCall))
+                        {
+                            hook = new ILHook(method, replaceRaycastManipulator, new ILHookConfig { ManualApply = true });
+                            hook.Apply();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error_NoCallerPrefix($"Failed to apply raycast hook to {method.FullDescription()}: {e}");
+
+                        hook?.Dispose();
+                        hook = null;
+                    }
+
+                    if (hook != null)
+                    {
+                        numAppliedHooks++;
+                    }
+                }
+            }
+
+            Log.Debug($"Applied {numAppliedHooks} raycast method hook(s) ({stopwatch.Elapsed.TotalMilliseconds:F0}ms)");
+        }
+
+        static bool matchRaycastMethodCall(Instruction x)
+        {
+            return x.MatchCallOrCallvirt(typeof(Physics), nameof(Physics.Raycast));
+        }
+
+        static void replaceRaycastManipulator(ILContext il)
+        {
+            ILCursor c = new ILCursor(il);
+
+            ILVariablePool variablePool = new ILVariablePool(il);
+
+            int patchCount = 0;
+
+            while (c.TryGotoNext(MoveType.AfterLabel, matchRaycastMethodCall))
+            {
+                MethodReference raycastMethod = (MethodReference)c.Next.Operand;
 
                 VariableDefinition rayVar = null;
+                VariableDefinition originVar = null;
+                VariableDefinition directionVar = null;
                 VariableDefinition hitInfoVar = null;
                 VariableDefinition maxDistanceVar = null;
                 VariableDefinition layerMaskVar = null;
                 VariableDefinition queryTriggerInteractionVar = null;
 
-                ParameterInfo[] raycastParameters = raycastMethod.GetParameters();
-                VariableDefinition[] raycastParameterLocals = new VariableDefinition[raycastParameters.Length];
-                for (int i = 0; i < raycastParameters.Length; i++)
+                List<VariableDefinition> pooledVariables = [];
+                List<VariableDefinition> allParameterVariables = [];
+
+                foreach (ParameterDefinition parameter in raycastMethod.Parameters)
                 {
-                    Type parameterType = raycastParameters[i].ParameterType;
-                    string parameterName = raycastParameters[i].Name;
+                    TypeReference parameterType = parameter.ParameterType;
+                    string parameterName = parameter.Name;
+                    VariableDefinition parameterVariable = variablePool.GetOrCreate(parameterType);
 
-                    VariableDefinition variableDefinition = new VariableDefinition(il.Import(parameterType));
-                    localVariables.Add(variableDefinition);
-                    raycastParameterLocals[i] = variableDefinition;
-
-                    if (parameterType == typeof(Ray))
+                    if (parameterType.Is(typeof(Ray)))
                     {
-                        rayVar = variableDefinition;
+                        rayVar = parameterVariable;
                     }
-                    else if (parameterType == typeof(RaycastHit).MakeByRefType())
+                    else if (parameterType.Is(typeof(Vector3)))
                     {
-                        hitInfoVar = variableDefinition;
+                        if (string.Equals(parameterName, "origin", StringComparison.OrdinalIgnoreCase))
+                        {
+                            originVar = parameterVariable;
+                        }
+                        else if (string.Equals(parameterName, "direction", StringComparison.OrdinalIgnoreCase))
+                        {
+                            directionVar = parameterVariable;
+                        }
                     }
-                    else if (parameterType == typeof(float))
+                    else if (parameterType.Is(typeof(RaycastHit).MakeByRefType()))
+                    {
+                        hitInfoVar = parameterVariable;
+                    }
+                    else if (parameterType.Is(typeof(float)))
                     {
                         if (string.Equals(parameterName, "maxDistance", StringComparison.OrdinalIgnoreCase))
                         {
-                            maxDistanceVar = variableDefinition;
+                            maxDistanceVar = parameterVariable;
                         }
                     }
-                    else if (parameterType == typeof(int))
+                    else if (parameterType.Is(typeof(int)))
                     {
                         if (string.Equals(parameterName, "layerMask", StringComparison.OrdinalIgnoreCase))
                         {
-                            layerMaskVar = variableDefinition;
+                            layerMaskVar = parameterVariable;
                         }
                     }
-                    else if (parameterType == typeof(QueryTriggerInteraction))
+                    else if (parameterType.Is(typeof(QueryTriggerInteraction)))
                     {
-                        queryTriggerInteractionVar = variableDefinition;
+                        queryTriggerInteractionVar = parameterVariable;
                     }
+
+                    allParameterVariables.Add(parameterVariable);
                 }
 
-                if (rayVar == null)
-                {
-                    Log.Error("Raycast method is missing ray parameter");
-                    return;
-                }
+                pooledVariables.AddRange(allParameterVariables);
+
+                c.EmitStoreStack(allParameterVariables);
 
                 if (hitInfoVar == null)
                 {
-                    hitInfoVar = new VariableDefinition(il.Import(typeof(RaycastHit)).MakeByReferenceType());
-                    localVariables.Add(hitInfoVar);
+                    hitInfoVar = variablePool.GetOrCreate(typeof(RaycastHit).MakeByRefType());
+                    pooledVariables.Add(hitInfoVar);
                 }
 
-                if (maxDistanceVar == null)
+                VariableDefinition replacementRaycastResultVar = variablePool.GetOrCreate<bool>();
+                pooledVariables.Add(replacementRaycastResultVar);
+
+                c.Emit(OpCodes.Ldarg_0);
+
+                if (rayVar != null)
                 {
-                    maxDistanceVar = new VariableDefinition(il.Import(typeof(float)));
-                    localVariables.Add(maxDistanceVar);
-
-                    c.Emit(OpCodes.Ldc_R4, float.PositiveInfinity);
-                    c.Emit(OpCodes.Stloc, maxDistanceVar);
-                }
-
-                if (layerMaskVar == null)
-                {
-                    layerMaskVar = new VariableDefinition(il.Import(typeof(int)));
-                    localVariables.Add(layerMaskVar);
-
-                    c.Emit(OpCodes.Ldc_I4, Physics.DefaultRaycastLayers);
-                    c.Emit(OpCodes.Stloc, layerMaskVar);
-                }
-
-                if (queryTriggerInteractionVar == null)
-                {
-                    queryTriggerInteractionVar = new VariableDefinition(il.Import(typeof(QueryTriggerInteraction)));
-                    localVariables.Add(queryTriggerInteractionVar);
-
-                    c.Emit(OpCodes.Ldc_I4, (int)QueryTriggerInteraction.UseGlobal);
-                    c.Emit(OpCodes.Stloc, queryTriggerInteractionVar);
-                }
-
-                VariableDefinition replacementRaycastResultVar = new VariableDefinition(il.Import(typeof(bool)));
-                localVariables.Add(replacementRaycastResultVar);
-
-                while (c.TryGotoNext(MoveType.Before, x => x.MatchCallOrCallvirt(raycastMethod)))
-                {
-                    c.MoveAfterLabels();
-
-                    for (int i = raycastParameterLocals.Length - 1; i >= 0; i--)
-                    {
-                        c.Emit(OpCodes.Stloc, raycastParameterLocals[i]);
-                    }
-
-                    c.Emit(OpCodes.Ldarg_0);
-
                     c.Emit(OpCodes.Ldloc, rayVar);
-                    c.Emit(OpCodes.Ldloc, hitInfoVar);
-                    c.Emit(OpCodes.Ldloc, maxDistanceVar);
-                    c.Emit(OpCodes.Ldloc, layerMaskVar);
-                    c.Emit(OpCodes.Ldloc, queryTriggerInteractionVar);
-
-                    c.Emit(OpCodes.Ldloca, replacementRaycastResultVar);
-
-                    c.EmitDelegate(tryReplaceRaycast);
-                    bool tryReplaceRaycast(object instance, Ray ray, ref RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction, out bool raycastResult)
-                    {
-                        if ((layerMask & _layersToPatch) == 0)
-                        {
-                            Log.Warning($"Raycast on layers {layerMask} does not match required layers");
-
-                            raycastResult = false;
-                            return false;
-                        }
-
-                        GameObject bodyObject;
-                        switch (instance)
-                        {
-                            case null:
-                                raycastResult = false;
-                                return false;
-                            case EntityState entityState:
-                                bodyObject = entityState.characterBody?.gameObject;
-                                break;
-                            default:
-                                Log.Error($"Instance type {instance.GetType().FullName} is not implemented");
-
-                                raycastResult = false;
-                                return false;
-                        }
-
-                        raycastResult = Util.CharacterRaycast(bodyObject, ray, out hitInfo, maxDistance, layerMask, queryTriggerInteraction);
-                        return true;
-                    }
-
-                    ILLabel originalRaycastCallLabel = c.DefineLabel();
-                    c.Emit(OpCodes.Brfalse, originalRaycastCallLabel);
-
-                    c.Emit(OpCodes.Ldloc, replacementRaycastResultVar);
-
-                    ILLabel afterOriginalRaycastLabel = c.DefineLabel();
-                    c.Emit(OpCodes.Br, afterOriginalRaycastLabel);
-
-                    c.MarkLabel(originalRaycastCallLabel);
-                    c.MoveAfterLabels();
-
-                    for (int i = 0; i < raycastParameterLocals.Length; i++)
-                    {
-                        c.Emit(OpCodes.Ldloc, raycastParameterLocals[i]);
-                    }
-
-                    // Skip over original call
-                    c.Index++;
-
-                    c.MarkLabel(afterOriginalRaycastLabel);
-
-                    patchCount++;
-                }
-
-                if (patchCount == 0)
-                {
-                    Log.Warning($"Found 0 patch locations for raycast method {raycastMethod.FullDescription()} in {il.Method.FullName}");
                 }
                 else
                 {
-#if DEBUG
-                    Log.Debug($"Found {patchCount} patch location(s) for raycast method {raycastMethod.FullDescription()} in {il.Method.FullName}");
-#endif
+                    c.Emit(OpCodes.Ldloc, originVar);
+                    c.Emit(OpCodes.Ldloc, directionVar);
+                    c.EmitDelegate(getRay);
+
+                    static Ray getRay(Vector3 origin, Vector3 direction)
+                    {
+                        return new Ray(origin, direction);
+                    }
                 }
+
+                c.Emit(OpCodes.Ldloc, hitInfoVar);
+
+                if (maxDistanceVar != null)
+                {
+                    c.Emit(OpCodes.Ldloc, maxDistanceVar);
+                }
+                else
+                {
+                    c.Emit(OpCodes.Ldc_R4, float.PositiveInfinity);
+                }
+
+                if (layerMaskVar != null)
+                {
+                    c.Emit(OpCodes.Ldloc, layerMaskVar);
+                }
+                else
+                {
+                    c.Emit(OpCodes.Ldc_I4, Physics.DefaultRaycastLayers);
+                }
+
+                if (queryTriggerInteractionVar != null)
+                {
+                    c.Emit(OpCodes.Ldloc, queryTriggerInteractionVar);
+                }
+                else
+                {
+                    c.Emit(OpCodes.Ldc_I4, (int)QueryTriggerInteraction.UseGlobal);
+                }
+
+                c.Emit(OpCodes.Ldloca, replacementRaycastResultVar);
+
+                c.EmitDelegate(tryReplaceRaycast);
+                static bool tryReplaceRaycast(object instance, Ray ray, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction, out bool raycastResult)
+                {
+                    if ((layerMask & _layersToPatch) == 0)
+                    {
+                        hitInfo = default;
+                        raycastResult = false;
+                        return false;
+                    }
+
+                    GameObject bodyObject;
+                    switch (instance)
+                    {
+                        case null:
+                            hitInfo = default;
+                            raycastResult = false;
+                            return false;
+                        case EntityState entityState:
+                            CharacterBody stateBody = entityState.characterBody;
+                            bodyObject = stateBody ? stateBody.gameObject : null;
+                            break;
+                        default:
+                            Log.Error($"Instance type {instance.GetType().FullName} is not implemented");
+
+                            hitInfo = default;
+                            raycastResult = false;
+                            return false;
+                    }
+
+                    raycastResult = Util.CharacterRaycast(bodyObject, ray, out hitInfo, maxDistance, layerMask, queryTriggerInteraction);
+                    return true;
+                }
+
+                c.EmitSkipMethodCall(OpCodes.Brtrue, c =>
+                {
+                    c.Emit(OpCodes.Ldloc, replacementRaycastResultVar);
+                });
+
+                foreach (VariableDefinition pooledVariable in pooledVariables)
+                {
+                    variablePool.Return(pooledVariable);
+                }
+
+                patchCount++;
+                c.SearchTarget = SearchTarget.Next;
             }
 
-            return manipulator;
+            if (patchCount == 0)
+            {
+                Log.Warning($"Found 0 patch locations in {il.Method.FullName}");
+            }
+            else
+            {
+                Log.Debug($"Found {patchCount} patch location(s) in {il.Method.FullName}");
+            }
         }
     }
 }

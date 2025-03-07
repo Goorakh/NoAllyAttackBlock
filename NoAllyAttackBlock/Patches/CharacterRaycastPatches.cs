@@ -52,36 +52,43 @@ namespace NoAllyAttackBlock.Patches
 
             foreach (Type stateType in allEntityStateTypes)
             {
-                foreach (MethodInfo method in stateType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                try
                 {
-                    if (method.IsGenericMethod || !method.HasMethodBody())
-                        continue;
-
-                    ILHook hook = null;
-                    try
+                    foreach (MethodInfo method in stateType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                     {
-                        using DynamicMethodDefinition dmd = new DynamicMethodDefinition(method);
-                        using ILContext il = new ILContext(dmd.Definition);
-                        ILCursor c = new ILCursor(il);
-
-                        if (c.TryGotoNext(matchRaycastMethodCall))
+                        ILHook hook = null;
+                        try
                         {
-                            hook = new ILHook(method, replaceRaycastManipulator, new ILHookConfig { ManualApply = true });
-                            hook.Apply();
+                            if (method.IsGenericMethod || !method.HasMethodBody())
+                                continue;
+
+                            using DynamicMethodDefinition dmd = new DynamicMethodDefinition(method);
+                            using ILContext il = new ILContext(dmd.Definition);
+                            ILCursor c = new ILCursor(il);
+
+                            if (c.TryGotoNext(matchRaycastMethodCall))
+                            {
+                                hook = new ILHook(method, replaceRaycastManipulator, new ILHookConfig { ManualApply = true });
+                                hook.Apply();
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error_NoCallerPrefix($"Failed to apply raycast hook to {method.DeclaringType.FullName}.{method.Name} ({stateType.Assembly.FullName}): {e}");
+
+                            hook?.Dispose();
+                            hook = null;
+                        }
+
+                        if (hook != null)
+                        {
+                            numAppliedHooks++;
                         }
                     }
-                    catch (Exception e)
-                    {
-                        Log.Error_NoCallerPrefix($"Failed to apply raycast hook to {method.FullDescription()}: {e}");
-
-                        hook?.Dispose();
-                        hook = null;
-                    }
-
-                    if (hook != null)
-                    {
-                        numAppliedHooks++;
-                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Error_NoCallerPrefix($"Failed to scan type for raycast hooks: {stateType.FullName} ({stateType.Assembly.FullName}): {e}");
                 }
             }
 

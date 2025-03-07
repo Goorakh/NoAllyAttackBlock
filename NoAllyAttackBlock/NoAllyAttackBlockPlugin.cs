@@ -14,7 +14,7 @@ namespace NoAllyAttackBlock
         public const string PluginGUID = PluginAuthor + "." + PluginName;
         public const string PluginAuthor = "Gorakh";
         public const string PluginName = "NoAllyAttackBlock";
-        public const string PluginVersion = "1.2.1";
+        public const string PluginVersion = "1.2.2";
 
         public static NoAllyAttackBlockPlugin Instance { get; private set; }
 

@@ -1,4 +1,4 @@
-**-.-.- Changes:**
+**1.2.2 Changes:**
 
 * Fixed compatibility issues
 

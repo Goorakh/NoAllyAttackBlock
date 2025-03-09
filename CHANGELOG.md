@@ -1,4 +1,4 @@
-**-.-.- Changes:**
+**1.2.3 Changes:**
 
 * Fixed compatibility issues with Starstorm 2's Chirr
 

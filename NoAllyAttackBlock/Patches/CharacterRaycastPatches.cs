@@ -178,6 +178,13 @@ namespace NoAllyAttackBlock.Patches
                 {
                     hitInfoVar = variablePool.GetOrCreate(typeof(RaycastHit).MakeByRefType());
                     pooledVariables.Add(hitInfoVar);
+
+                    // a ref var needs to point to some location, otherwise nullrefs when trying to assign/read
+                    VariableDefinition hitInfoDummyVar = variablePool.GetOrCreate<RaycastHit>();
+                    pooledVariables.Add(hitInfoDummyVar);
+
+                    c.Emit(OpCodes.Ldloca, hitInfoDummyVar);
+                    c.Emit(OpCodes.Stloc, hitInfoVar);
                 }
 
                 VariableDefinition replacementRaycastResultVar = variablePool.GetOrCreate<bool>();

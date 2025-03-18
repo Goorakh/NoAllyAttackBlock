@@ -1,4 +1,4 @@
-**-.-.- Changes:**
+**1.2.4 Changes:**
 
 * Fixed 99% load screen crash compatibility issue
 

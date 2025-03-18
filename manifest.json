@@ -2,7 +2,7 @@
 	"name": "NoAllyAttackBlock",
 	"authorName": "Gorakh",
 	"displayName": "Disable Ally Attack Collision",
-	"version_number": "1.2.3",
+	"version_number": "1.2.4",
 	"website_url": "https://github.com/Goorakh/NoAllyAttackBlock",
 	"description": "Makes attacks not collide with your allies",
 	"dependencies": [

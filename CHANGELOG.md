@@ -1,3 +1,7 @@
+**-.-.- Changes:**
+
+* Fixed 99% load screen crash compatibility issue
+
 **1.2.3 Changes:**
 
 * Fixed compatibility issues with Starstorm 2's Chirr

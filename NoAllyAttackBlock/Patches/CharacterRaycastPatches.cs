@@ -59,6 +59,9 @@ namespace NoAllyAttackBlock.Patches
                         ILHook hook = null;
                         try
                         {
+                            // The IsGenericMethod call sometimes causes a crash if accessed on a method where an assembly reference can't be resolved,
+                            // the DeclaringType getter throws an exception instead, so do that first to catch it before trying to check IsGenericMethod
+                            _ = method.DeclaringType;
                             if (method.IsGenericMethod || !method.HasMethodBody())
                                 continue;
 

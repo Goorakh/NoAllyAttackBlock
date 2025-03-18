@@ -74,7 +74,7 @@ namespace NoAllyAttackBlock.Patches
                         }
                         catch (Exception e)
                         {
-                            Log.Warning_NoCallerPrefix($"Failed to apply raycast hook to {method.DeclaringType.FullName}.{method.Name} ({stateType.Assembly.FullName}): {e}");
+                            Log.Warning($"Failed to apply raycast hook to {method.DeclaringType.FullName}.{method.Name} ({stateType.Assembly.FullName}): {e.Message}");
 
                             hook?.Dispose();
                             hook = null;
@@ -88,7 +88,7 @@ namespace NoAllyAttackBlock.Patches
                 }
                 catch (Exception e)
                 {
-                    Log.Warning_NoCallerPrefix($"Failed to scan type for raycast hooks: {stateType.FullName} ({stateType.Assembly.FullName}): {e}");
+                    Log.Warning($"Failed to scan type for raycast hooks: {stateType.FullName} ({stateType.Assembly.FullName}): {e.Message}");
                 }
             }
 

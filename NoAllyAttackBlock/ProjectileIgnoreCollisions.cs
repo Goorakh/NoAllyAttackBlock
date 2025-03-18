@@ -146,7 +146,7 @@ namespace NoAllyAttackBlock
                         if (modelTransform && !modelTransform.IsChildOf(body.transform))
                         {
                             Collider[] modelColliders = modelTransform.GetComponentsInChildren<Collider>(true);
-                            ArrayUtil.Append(ref bodyColliders, modelColliders);
+                            bodyColliders = [.. bodyColliders, .. modelColliders];
                         }
                     }
 

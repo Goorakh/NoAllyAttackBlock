@@ -30,7 +30,7 @@ namespace NoAllyAttackBlock.Utils
 
         public BodyIndex this[int index] => _parsedArray[index];
 
-        BodyIndex[] _parsedArray;
+        BodyIndex[] _parsedArray = [];
 
         bool _catalogAvailable;
         bool _isDisposed;
@@ -97,23 +97,23 @@ namespace NoAllyAttackBlock.Utils
 
             string[] splitInput = Config.Value.Split([","], StringSplitOptions.RemoveEmptyEntries);
 
-            List<BodyIndex> parsedArray = new List<BodyIndex>(splitInput.Length);
+            List<BodyIndex> parsedBodyIndices = new List<BodyIndex>(splitInput.Length);
 
             for (int i = 0; i < splitInput.Length; i++)
             {
-                splitInput[i] = splitInput[i].Trim();
+                string bodyName = splitInput[i].Trim();
 
-                if (parseBodyIndex(splitInput[i], out BodyIndex bodyIndex))
+                if (parseBodyIndex(bodyName, out BodyIndex bodyIndex))
                 {
-                    parsedArray.Add(bodyIndex);
+                    parsedBodyIndices.Add(bodyIndex);
                 }
                 else
                 {
-                    Log.Warning($"Failed to find character matching '{splitInput[i]}' for '{Config.Definition}'");
+                    Log.Warning($"Failed to find character matching '{bodyName}' for '{Config.Definition}'");
                 }
             }
 
-            _parsedArray = parsedArray.ToArray();
+            _parsedArray = [.. parsedBodyIndices];
             Array.Sort(_parsedArray, Comparer);
 
             Log.Debug($"Parsed body list value ({Config.Definition}): [{string.Join(", ", _parsedArray.Select(BodyCatalog.GetBodyName))}]");
@@ -127,50 +127,51 @@ namespace NoAllyAttackBlock.Utils
             if (bodyIndex != BodyIndex.None)
                 return false;
 
-            bool checkName(string name)
+            static bool checkName(string name, string input)
             {
                 StringBuilder filteredNameBuilder = HG.StringBuilderPool.RentStringBuilder();
                 StringBuilder asciiOnlyNameBuilder = HG.StringBuilderPool.RentStringBuilder();
                 StringBuilder alphaNumericOnlyNameBuilder = HG.StringBuilderPool.RentStringBuilder();
 
-                for (int i = 0; i < name.Length; i++)
+                try
                 {
-                    if (char.IsWhiteSpace(name[i]) || name[i] == ',')
-                        continue;
-
-                    filteredNameBuilder.Append(name[i]);
-
-                    if (name[i] <= 0x7F)
+                    for (int i = 0; i < name.Length; i++)
                     {
-                        asciiOnlyNameBuilder.Append(name[i]);
+                        if (char.IsWhiteSpace(name[i]) || name[i] == ',')
+                            continue;
+
+                        filteredNameBuilder.Append(name[i]);
+
+                        if (name[i] <= 0x7F)
+                        {
+                            asciiOnlyNameBuilder.Append(name[i]);
+                        }
+
+                        if (char.IsLetterOrDigit(name[i]))
+                        {
+                            alphaNumericOnlyNameBuilder.Append(name[i]);
+                        }
                     }
 
-                    if (char.IsLetterOrDigit(name[i]))
-                    {
-                        alphaNumericOnlyNameBuilder.Append(name[i]);
-                    }
+                    return (filteredNameBuilder.Length > 0 && string.Equals(filteredNameBuilder.ToString(), input, StringComparison.OrdinalIgnoreCase)) ||
+                           (asciiOnlyNameBuilder.Length > 0 && string.Equals(asciiOnlyNameBuilder.ToString(), input, StringComparison.OrdinalIgnoreCase)) ||
+                           (alphaNumericOnlyNameBuilder.Length > 0 && string.Equals(alphaNumericOnlyNameBuilder.ToString(), input, StringComparison.OrdinalIgnoreCase));
                 }
-
-                string filteredName = filteredNameBuilder.ToString();
-                string asciiOnlyName = asciiOnlyNameBuilder.ToString();
-                string alphaNumericName = alphaNumericOnlyNameBuilder.ToString();
-
-                HG.StringBuilderPool.ReturnStringBuilder(alphaNumericOnlyNameBuilder);
-                HG.StringBuilderPool.ReturnStringBuilder(asciiOnlyNameBuilder);
-                HG.StringBuilderPool.ReturnStringBuilder(filteredNameBuilder);
-
-                return string.Equals(filteredName, input, StringComparison.OrdinalIgnoreCase) ||
-                       string.Equals(asciiOnlyName, input, StringComparison.OrdinalIgnoreCase) ||
-                       string.Equals(alphaNumericName, input, StringComparison.OrdinalIgnoreCase);
+                finally
+                {
+                    alphaNumericOnlyNameBuilder = HG.StringBuilderPool.ReturnStringBuilder(alphaNumericOnlyNameBuilder);
+                    asciiOnlyNameBuilder = HG.StringBuilderPool.ReturnStringBuilder(asciiOnlyNameBuilder);
+                    filteredNameBuilder = HG.StringBuilderPool.ReturnStringBuilder(filteredNameBuilder);
+                }
             }
 
             foreach (CharacterBody body in BodyCatalog.allBodyPrefabBodyBodyComponents)
             {
                 string bodyName = body.name;
-                if (checkName(bodyName) ||
-                    bodyName.EndsWith("body", StringComparison.OrdinalIgnoreCase) && checkName(bodyName.Remove(bodyName.Length - 4)) ||
-                    checkName(body.baseNameToken) ||
-                    !Language.IsTokenInvalid(body.baseNameToken) && checkName(Language.english.GetLocalizedStringByToken(body.baseNameToken)))
+                if ((!string.IsNullOrWhiteSpace(bodyName) &&
+                    (checkName(bodyName, input) || (bodyName.EndsWith("body", StringComparison.OrdinalIgnoreCase) && bodyName.Length > 4 && checkName(bodyName[0..^4], input)))) ||
+                    (!string.IsNullOrWhiteSpace(body.baseNameToken) && checkName(body.baseNameToken, input)) ||
+                    (Language.english.TokenIsRegistered(body.baseNameToken) && checkName(Language.english.GetLocalizedStringByToken(body.baseNameToken), input)))
                 {
                     bodyIndex = body.bodyIndex;
                     return true;

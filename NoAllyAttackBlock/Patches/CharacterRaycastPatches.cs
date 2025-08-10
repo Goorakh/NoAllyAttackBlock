@@ -123,7 +123,6 @@ namespace NoAllyAttackBlock.Patches
                 VariableDefinition layerMaskVar = null;
                 VariableDefinition queryTriggerInteractionVar = null;
 
-                List<VariableDefinition> pooledVariables = [];
                 List<VariableDefinition> allParameterVariables = [];
 
                 foreach (ParameterDefinition parameter in raycastMethod.Parameters)
@@ -173,25 +172,20 @@ namespace NoAllyAttackBlock.Patches
                     allParameterVariables.Add(parameterVariable);
                 }
 
-                pooledVariables.AddRange(allParameterVariables);
-
                 c.EmitStoreStack(allParameterVariables);
 
                 if (hitInfoVar == null)
                 {
                     hitInfoVar = variablePool.GetOrCreate(typeof(RaycastHit).MakeByRefType());
-                    pooledVariables.Add(hitInfoVar);
 
                     // a ref var needs to point to some location, otherwise nullrefs when trying to assign/read
                     VariableDefinition hitInfoDummyVar = variablePool.GetOrCreate<RaycastHit>();
-                    pooledVariables.Add(hitInfoDummyVar);
 
                     c.Emit(OpCodes.Ldloca, hitInfoDummyVar);
                     c.Emit(OpCodes.Stloc, hitInfoVar);
                 }
 
                 VariableDefinition replacementRaycastResultVar = variablePool.GetOrCreate<bool>();
-                pooledVariables.Add(replacementRaycastResultVar);
 
                 c.Emit(OpCodes.Ldarg_0);
 
@@ -280,10 +274,7 @@ namespace NoAllyAttackBlock.Patches
                     c.Emit(OpCodes.Ldloc, replacementRaycastResultVar);
                 });
 
-                foreach (VariableDefinition pooledVariable in pooledVariables)
-                {
-                    variablePool.Return(pooledVariable);
-                }
+                variablePool.ReturnAll();
 
                 patchCount++;
                 c.SearchTarget = SearchTarget.Next;

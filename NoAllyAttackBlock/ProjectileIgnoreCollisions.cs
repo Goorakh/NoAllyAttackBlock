@@ -1,5 +1,4 @@
-﻿using NoAllyAttackBlock.Utils;
-using RoR2;
+﻿using RoR2;
 using RoR2.Projectile;
 using System;
 using System.Collections.Generic;
@@ -159,7 +158,7 @@ namespace NoAllyAttackBlock
                     }
                 }
 
-                Log.Debug($"{name} ({_projectileController.netId}) {(ignore ? "disabled" : "enabled")} collision with {Util.GetBestBodyName(body.gameObject)} ({body.netId})");
+                Log.Debug($"{Util.GetGameObjectHierarchyName(gameObject)} ({_projectileController.netId}) {(ignore ? "disabled" : "enabled")} collision with {Util.GetBestBodyName(body.gameObject)} ({body.netId})");
             }
         }
     }

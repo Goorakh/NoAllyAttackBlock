@@ -11,7 +11,9 @@ namespace NoAllyAttackBlock.Utils
     {
         readonly ILContext _context;
 
-        readonly List<VariableDefinition> _variables = [];
+        readonly List<VariableDefinition> _pooledVariables = [];
+
+        readonly List<VariableDefinition> _borrowedVariables = [];
 
         public ILVariablePool(ILContext context)
         {
@@ -32,25 +34,36 @@ namespace NoAllyAttackBlock.Utils
         {
             VariableDefinition variable = null;
 
-            for (int i = 0; i < _variables.Count; i++)
+            for (int i = 0; i < _pooledVariables.Count; i++)
             {
-                VariableDefinition pooledVariable = _variables[i];
+                VariableDefinition pooledVariable = _pooledVariables[i];
                 if (pooledVariable.VariableType.FullName == variableType.FullName)
                 {
                     variable = pooledVariable;
-                    _variables.RemoveAt(i);
+                    _pooledVariables.RemoveAt(i);
                     break;
                 }
             }
 
             variable ??= _context.AddVariable(variableType);
-
+            _borrowedVariables.Add(variable);
             return variable;
         }
 
         public void Return(VariableDefinition variable)
         {
-            _variables.Add(variable);
+            if (_borrowedVariables.Remove(variable))
+            {
+                _pooledVariables.Add(variable);
+            }
+        }
+
+        public void ReturnAll()
+        {
+            for (int i = _borrowedVariables.Count - 1; i >= 0; i--)
+            {
+                Return(_borrowedVariables[i]);
+            }
         }
     }
 }

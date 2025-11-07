@@ -11,7 +11,7 @@ namespace NoAllyAttackBlock
 {
     static class RiskOfOptionsCompat
     {
-        public static bool Active => Chainloader.PluginInfos.ContainsKey("com.rune580.riskofoptions");
+        public static bool Active => Chainloader.PluginInfos.ContainsKey(RiskOfOptions.PluginInfo.PLUGIN_GUID);
 
         [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
         public static void Run()

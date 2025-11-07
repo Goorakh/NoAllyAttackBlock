@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace NoAllyAttackBlock.Utils
 {
-    public class ILVariablePool
+    public sealed class ILVariablePool
     {
         readonly ILContext _context;
 

@@ -8,7 +8,7 @@ using System.Text;
 
 namespace NoAllyAttackBlock.Utils
 {
-    public class ParsedBodyListConfig : IReadOnlyList<BodyIndex>, IDisposable
+    public sealed class ParsedBodyListConfig : IReadOnlyList<BodyIndex>, IDisposable
     {
         public ConfigEntry<string> Config { get; }
 

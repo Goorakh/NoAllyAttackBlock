@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace NoAllyAttackBlock.Utils
 {
-    public class BodyIndexComparer : IComparer<BodyIndex>
+    public sealed class BodyIndexComparer : IComparer<BodyIndex>
     {
         public static BodyIndexComparer Instance { get; } = new BodyIndexComparer();
 

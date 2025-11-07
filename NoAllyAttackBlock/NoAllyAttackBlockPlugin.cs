@@ -9,7 +9,7 @@ namespace NoAllyAttackBlock
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
     [BepInDependency(RiskOfOptions.PluginInfo.PLUGIN_GUID, BepInDependency.DependencyFlags.SoftDependency)]
-    public class NoAllyAttackBlockPlugin : BaseUnityPlugin
+    public sealed class NoAllyAttackBlockPlugin : BaseUnityPlugin
     {
         public const string PluginGUID = PluginAuthor + "." + PluginName;
         public const string PluginAuthor = "Gorakh";

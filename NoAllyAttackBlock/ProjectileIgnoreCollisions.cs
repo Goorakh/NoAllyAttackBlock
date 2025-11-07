@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace NoAllyAttackBlock
 {
-    public class ProjectileIgnoreCollisions : MonoBehaviour
+    public sealed class ProjectileIgnoreCollisions : MonoBehaviour
     {
         [SystemInitializer(typeof(ProjectileCatalog))]
         static void Init()

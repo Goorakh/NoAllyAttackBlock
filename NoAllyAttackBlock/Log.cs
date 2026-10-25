@@ -46,12 +46,13 @@ namespace NoAllyAttackBlock
                                 .Append(" (").Append(callerMemberName).Append("):");
         }
 
-        static StringBuilder buildCallerLogString(string callerPath, string callerMemberName, int callerLineNumber, object data)
+        static string buildCallerLogString(string callerPath, string callerMemberName, int callerLineNumber, object data)
         {
             return _sharedStringBuilder.Clear()
                                        .AppendCallerPrefix(callerPath, callerMemberName, callerLineNumber)
                                        .Append(' ')
-                                       .Append(data);
+                                       .Append(data)
+                                       .ToString();
         }
 
         [Conditional("DEBUG")]

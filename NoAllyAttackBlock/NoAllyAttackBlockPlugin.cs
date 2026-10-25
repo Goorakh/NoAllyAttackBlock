@@ -22,6 +22,8 @@ namespace NoAllyAttackBlock
 
         public static ConfigEntry<bool> IgnoreStickProjectiles { get; private set; }
 
+        public static ConfigEntry<EngineerLaserCutterCollisionMode> EngineerLaserCutterMode { get; private set; }
+
         public static ParsedBodyListConfig IgnoreAttackers { get; private set; }
 
         public static ParsedBodyListConfig IgnoreVictims { get; private set; }
@@ -74,8 +76,18 @@ namespace NoAllyAttackBlock
             ConfigEntry<string> ignoreVictimsConfig = Config.Bind(new ConfigDefinition("General", "Never Ignore Collisions With"), "", new ConfigDescription("A comma-separated list of characters to never ignore collisions with. Any character in this list will always have collision with incoming ally attacks. Both internal and English display names are accepted, with whitespace and commas removed."));
             IgnoreVictims = new ParsedBodyListConfig(ignoreVictimsConfig);
 
+            EngineerLaserCutterMode = Config.Bind(new ConfigDefinition("Behavior", "Engineer Laser Cutter"), EngineerLaserCutterCollisionMode.OnlyCollideMechanical, new ConfigDescription($"""
+Controls how Engineer's Laser Cutter skill collides with allies.
+
+{nameof(EngineerLaserCutterCollisionMode.OnlyCollideMechanical)}: The laser will only collide with allies that can be healed by the skill. This is the default value.
+
+{nameof(EngineerLaserCutterCollisionMode.NeverCollide)}: The laser will never collide with allies. Note that this makes healing an ally with the skill impossible.
+"""));
+
             if (RiskOfOptionsCompat.Active)
+            {
                 RiskOfOptionsCompat.Run();
+            }
 
             stopwatch.Stop();
             Log.Message_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");

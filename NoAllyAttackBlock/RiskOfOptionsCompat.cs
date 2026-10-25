@@ -19,19 +19,27 @@ namespace NoAllyAttackBlock
             const string GUID = NoAllyAttackBlockPlugin.PluginGUID;
             const string NAME = "Disable Ally Attack Collision";
 
-            ModSettingsManager.AddOption(new CheckBoxOption(NoAllyAttackBlockPlugin.EnablePassThroughForEnemies), GUID, NAME);
-
-            ModSettingsManager.AddOption(new CheckBoxOption(NoAllyAttackBlockPlugin.IgnoreStickProjectiles), GUID, NAME);
-
-            ModSettingsManager.AddOption(new StringInputFieldOption(NoAllyAttackBlockPlugin.IgnoreAttackers.Config, new InputFieldConfig
+            // General
             {
-                submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit
-            }), GUID, NAME);
+                ModSettingsManager.AddOption(new CheckBoxOption(NoAllyAttackBlockPlugin.EnablePassThroughForEnemies), GUID, NAME);
 
-            ModSettingsManager.AddOption(new StringInputFieldOption(NoAllyAttackBlockPlugin.IgnoreVictims.Config, new InputFieldConfig
+                ModSettingsManager.AddOption(new CheckBoxOption(NoAllyAttackBlockPlugin.IgnoreStickProjectiles), GUID, NAME);
+
+                ModSettingsManager.AddOption(new StringInputFieldOption(NoAllyAttackBlockPlugin.IgnoreAttackers.Config, new InputFieldConfig
+                {
+                    submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit
+                }), GUID, NAME);
+
+                ModSettingsManager.AddOption(new StringInputFieldOption(NoAllyAttackBlockPlugin.IgnoreVictims.Config, new InputFieldConfig
+                {
+                    submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit
+                }), GUID, NAME);
+            }
+
+            // Behavior
             {
-                submitOn = InputFieldConfig.SubmitEnum.OnExitOrSubmit
-            }), GUID, NAME);
+                ModSettingsManager.AddOption(new ChoiceOption(NoAllyAttackBlockPlugin.EngineerLaserCutterMode), GUID, NAME);
+            }
 
             FileInfo iconFile = null;
 

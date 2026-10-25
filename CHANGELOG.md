@@ -1,3 +1,7 @@
+**1.2.5 Changes:**
+
+* Fixed Engineer's Laser Cutter skill not being able to hit allies, added config option to restore the previous behavior.
+
 **1.2.4 Changes:**
 
 * Fixed 99% load screen crash compatibility issue

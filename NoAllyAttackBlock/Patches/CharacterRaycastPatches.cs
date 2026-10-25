@@ -1,109 +1,306 @@
 ﻿using EntityStates;
 using HarmonyLib;
+using HG;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
 using MonoMod.Utils;
+using NoAllyAttackBlock.Caching;
 using NoAllyAttackBlock.Utils;
 using NoAllyAttackBlock.Utils.Extensions;
 using RoR2;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using UnityEngine;
 
+using Path = System.IO.Path;
+
 namespace NoAllyAttackBlock.Patches
 {
-    static class CharacterRaycastPatches
+    internal static class CharacterRaycastPatches
     {
-        static readonly LayerMask _layersToPatch = LayerIndex.entityPrecise.mask | LayerIndex.playerBody.mask | LayerIndex.enemyBody.mask;
+        private static readonly string _cacheDirectory = CacheHelper.GetCacheDirectory("CharacterRaycastPatches");
+
+        private static readonly LayerMask _layersToPatch = LayerIndex.entityPrecise.mask | LayerIndex.playerBody.mask | LayerIndex.enemyBody.mask;
 
         [SystemInitializer]
-        static void Init()
+        private static void Init()
         {
             // EntityStateCatalog does not have a SystemInitializer, so it can't be used as a dependency for our initializer
-            RoR2Application.onLoad = (Action)Delegate.Combine(RoR2Application.onLoad, onLoad);
+            RoR2Application.onLoad += onLoad;
+
+            Directory.CreateDirectory(_cacheDirectory);
         }
 
-        static void onLoad()
+        private static void onLoad()
         {
             Log.Debug($"Collecting state types");
 
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
+            Stopwatch stopwatch = Stopwatch.StartNew();
 
-            HashSet<Type> allEntityStateTypes = new HashSet<Type>(EntityStateCatalog.stateIndexToType.Length);
+            Dictionary<Assembly, HashSet<Type>> entityStateTypesByAssembly = [];
+            int numFoundStateTypes = 0;
 
+            // No reason to try to avoid doing this/caching it, it is incredibly cheap for what it looks like (~3ms for only RoR2.dll states)
             for (int i = 0; i < EntityStateCatalog.stateIndexToType.Length; i++)
             {
                 Type stateType = EntityStateCatalog.stateIndexToType[i];
-                while (stateType != null && typeof(EntityState).IsAssignableFrom(stateType) && allEntityStateTypes.Add(stateType))
+                while (stateType != null &&
+                       typeof(EntityState).IsAssignableFrom(stateType) &&
+                       entityStateTypesByAssembly.GetOrAddNew(stateType.Assembly).Add(stateType))
                 {
                     stateType = stateType.BaseType;
+                    numFoundStateTypes++;
                 }
             }
 
-            Log.Debug($"Found {allEntityStateTypes.Count} state type(s) ({stopwatch.Elapsed.TotalMilliseconds:F0}ms)");
+            Log.Debug($"Found {numFoundStateTypes} state types across {entityStateTypesByAssembly.Count} assemblies ({stopwatch.Elapsed.TotalMilliseconds:F0}ms)");
             stopwatch.Restart();
 
             int numAppliedHooks = 0;
 
-            foreach (Type stateType in allEntityStateTypes)
+            if (entityStateTypesByAssembly.Count > 0)
+            {
+                foreach ((Assembly assembly, HashSet<Type> entityStateTypes) in entityStateTypesByAssembly)
+                {
+                    numAppliedHooks += tryPatchEntityStateTypes(assembly, entityStateTypes);
+                }
+
+                Log.Debug($"Applied {numAppliedHooks} raycast method hook(s) ({stopwatch.Elapsed.TotalMilliseconds:F0}ms)");
+            }
+        }
+
+        private static int tryPatchEntityStateTypes(Assembly assembly, HashSet<Type> entityStateTypes)
+        {
+            AssemblyCacheHeader assemblyHeader = AssemblyCacheHeader.FromAssembly(assembly);
+
+            string cacheFilePath = Path.Combine(_cacheDirectory, assembly.FullName);
+
+            List<MethodInfo> methodsToPatch = [];
+
+            // Methods which we could not extract the necessary info on, such as if the method body references a type in an assembly which is not loaded,
+            // we need to hold on to these methods in order to be able to re-check it if the conditions are right in the future.
+            List<MethodInfo> unverifiedMethods = [];
+
+            bool cacheInvalidated = false;
+            if (!tryReadFromAssemblyCache(assembly, cacheFilePath, methodsToPatch, unverifiedMethods))
+            {
+                getMethodsToPatch(assembly, entityStateTypes, methodsToPatch, unverifiedMethods);
+                cacheInvalidated = true;
+            }
+
+            for (int i = unverifiedMethods.Count - 1; i >= 0; i--)
+            {
+                MethodInfo unverifiedMethod = unverifiedMethods[i];
+                try
+                {
+                    _ = unverifiedMethod.DeclaringType;
+                    _ = unverifiedMethod.GetMethodBody();
+                }
+                catch (Exception)
+                {
+                    // Method still does not resolve, keep it in the list for next time
+                    continue;
+                }
+
+                // This method used to throw an exception when accessed (likely due to a missing assembly reference), but now it did, check if we should be patching it.
+                if (shouldApplyRaycastManipulatorPatch(unverifiedMethod))
+                {
+                    // We should patch it!
+                    methodsToPatch.Add(unverifiedMethod);
+                }
+
+                // Regardless of if the patch should apply or not, the method is now properly checked, and we need to update the cache
+                unverifiedMethods.RemoveAt(i);
+                cacheInvalidated = true;
+            }
+
+            for (int i = methodsToPatch.Count - 1; i >= 0; i--)
+            {
+                MethodInfo methodToPatch = methodsToPatch[i];
+                try
+                {
+                    _ = methodToPatch.DeclaringType;
+                    _ = methodToPatch.GetMethodBody();
+                }
+                catch (Exception e)
+                {
+                    Log.Info_NoCallerPrefix($"Failed to resolve patch target {methodToPatch.DeclaringType.FullName}.{methodToPatch.Name} ({assembly.FullName}): {e}");
+
+                    // This method no longer resolves, add it back into the unverified list and update the cache
+                    unverifiedMethods.Add(methodToPatch);
+                    methodsToPatch.RemoveAt(i);
+                    cacheInvalidated = true;
+                    continue;
+                }
+
+                ILHook hook = null;
+                try
+                {
+                    hook = new ILHook(methodToPatch, replaceRaycastManipulator, new ILHookConfig { ManualApply = true });
+                    hook.Apply();
+                }
+                catch (Exception e)
+                {
+                    Log.Warning($"Failed to apply raycast hook to {methodToPatch.DeclaringType.FullName}.{methodToPatch.Name} ({assembly.FullName}): {e.Message}");
+
+                    hook?.Dispose();
+                    hook = null;
+                }
+            }
+
+            if (cacheInvalidated)
+            {
+                writeAssemblyToCache(assembly, cacheFilePath, methodsToPatch, unverifiedMethods);
+            }
+
+            return methodsToPatch.Count;
+        }
+
+        private static void getMethodsToPatch(Assembly assembly, HashSet<Type> entityStateTypes, List<MethodInfo> destMethodsToPatch, List<MethodInfo> destUnverifiedMethods)
+        {
+            foreach (Type stateType in entityStateTypes)
+            {
+                if (stateType.IsGenericTypeDefinition)
+                {
+                    continue;
+                }
+
+                foreach (MethodInfo method in stateType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                {
+                    try
+                    {
+                        // The IsGenericMethod call sometimes causes a crash if accessed on a method where an assembly reference can't be resolved,
+                        // the DeclaringType getter throws an exception instead, so do that first to catch it before trying to check IsGenericMethod
+                        _ = method.DeclaringType;
+                        if (method.IsGenericMethod || !method.HasMethodBody())
+                        {
+                            continue;
+                        }
+
+                        if (shouldApplyRaycastManipulatorPatch(method))
+                        {
+                            destMethodsToPatch.Add(method);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Debug_NoCallerPrefix($"Caught exception while checking method {stateType.FullName}.{method.Name} in {assembly.FullName}, adding to unverified methods list: {e}");
+                        destUnverifiedMethods.Add(method);
+                    }
+                }
+            }
+        }
+
+        private static bool tryReadFromAssemblyCache(Assembly assembly, string cacheFilePath, List<MethodInfo> destMethodsToPatch, List<MethodInfo> destUnverifiedMethods)
+        {
+            if (File.Exists(cacheFilePath))
             {
                 try
                 {
-                    foreach (MethodInfo method in stateType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                    using (FileStream cacheFile = File.Open(cacheFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (BinaryReader cacheReader = new BinaryReader(cacheFile))
                     {
-                        ILHook hook = null;
-                        try
+                        string cacheVersion = cacheReader.ReadString();
+                        // If this cache was made on an older version of the mod, our code may have changed in a way where we can no longer trust the cache at all
+                        if (cacheVersion == NoAllyAttackBlockPlugin.PluginVersion)
                         {
-                            // The IsGenericMethod call sometimes causes a crash if accessed on a method where an assembly reference can't be resolved,
-                            // the DeclaringType getter throws an exception instead, so do that first to catch it before trying to check IsGenericMethod
-                            _ = method.DeclaringType;
-                            if (method.IsGenericMethod || !method.HasMethodBody())
-                                continue;
-
-                            using DynamicMethodDefinition dmd = new DynamicMethodDefinition(method);
-                            using ILContext il = new ILContext(dmd.Definition);
-                            ILCursor c = new ILCursor(il);
-
-                            if (c.TryGotoNext(matchRaycastMethodCall))
+                            AssemblyCacheHeader cacheAssemblyHeader = cacheReader.ReadAssemblyCacheHeader();
+                            if (cacheAssemblyHeader.ManifestVersionId == assembly.ManifestModule.ModuleVersionId)
                             {
-                                hook = new ILHook(method, replaceRaycastManipulator, new ILHookConfig { ManualApply = true });
-                                hook.Apply();
+                                Log.Info($"Using assembly cache for {assembly.FullName}");
+
+                                int methodsToPatchCount = cacheReader.ReadInt32();
+                                ListUtils.EnsureCapacity(destMethodsToPatch, methodsToPatchCount);
+                                for (int i = 0; i < methodsToPatchCount; i++)
+                                {
+                                    MethodInfo methodToPatch = cacheReader.ReadMethodInfo(assembly);
+                                    if (methodToPatch != null)
+                                    {
+                                        destMethodsToPatch.Add(methodToPatch);
+                                    }
+                                }
+
+                                int unverifiedMethodsCount = cacheReader.ReadInt32();
+                                ListUtils.EnsureCapacity(destUnverifiedMethods, unverifiedMethodsCount);
+                                for (int i = 0; i < unverifiedMethodsCount; i++)
+                                {
+                                    MethodInfo unverifiedMethod = cacheReader.ReadMethodInfo(assembly);
+                                    if (unverifiedMethod != null)
+                                    {
+                                        destMethodsToPatch.Add(unverifiedMethod);
+                                    }
+                                }
+
+                                return true;
                             }
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Warning($"Failed to apply raycast hook to {method.DeclaringType.FullName}.{method.Name} ({stateType.Assembly.FullName}): {e.Message}");
-
-                            hook?.Dispose();
-                            hook = null;
-                        }
-
-                        if (hook != null)
-                        {
-                            numAppliedHooks++;
                         }
                     }
                 }
                 catch (Exception e)
                 {
-                    Log.Warning($"Failed to scan type for raycast hooks: {stateType.FullName} ({stateType.Assembly.FullName}): {e.Message}");
+                    Log.Error_NoCallerPrefix($"Exception occured reading cache file for {assembly.FullName}, it will be invalidated: {e}");
                 }
+
+                // The cache file was outdated, delete it
+                Log.Info($"Assembly cache for {assembly.FullName} is out of date, it will be regenerated");
+                File.Delete(cacheFilePath);
             }
 
-            Log.Debug($"Applied {numAppliedHooks} raycast method hook(s) ({stopwatch.Elapsed.TotalMilliseconds:F0}ms)");
+            return false;
         }
 
-        static bool matchRaycastMethodCall(Instruction x)
+        private static void writeAssemblyToCache(Assembly assembly, string cacheFilePath, List<MethodInfo> methodsToPatch, List<MethodInfo> unverifiedMethods)
+        {
+            Log.Info($"Creating assembly cache for {assembly.FullName}");
+
+            try
+            {
+                using FileStream cacheFile = File.Open(cacheFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                using BinaryWriter cacheWriter = new BinaryWriter(cacheFile);
+
+                cacheWriter.Write(NoAllyAttackBlockPlugin.PluginVersion);
+
+                AssemblyCacheHeader assemblyCacheHeader = AssemblyCacheHeader.FromAssembly(assembly);
+                cacheWriter.WriteAssemblyCacheHeader(assemblyCacheHeader);
+
+                cacheWriter.Write(methodsToPatch.Count);
+                foreach (MethodInfo methodToPatch in methodsToPatch)
+                {
+                    cacheWriter.WriteMember(methodToPatch);
+                }
+
+                cacheWriter.Write(unverifiedMethods.Count);
+                foreach (MethodInfo unverifiedMethod in unverifiedMethods)
+                {
+                    cacheWriter.WriteMember(unverifiedMethod);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error_NoCallerPrefix($"Failed to write assembly {assembly.FullName} to cache file at {cacheFilePath}: {e}");
+            }
+        }
+
+        private static bool shouldApplyRaycastManipulatorPatch(MethodBase method)
+        {
+            using DynamicMethodDefinition dmd = new DynamicMethodDefinition(method);
+            using ILContext il = new ILContext(dmd.Definition);
+            ILCursor c = new ILCursor(il);
+
+            return c.TryGotoNext(matchRaycastMethodCall);
+        }
+
+        private static bool matchRaycastMethodCall(Instruction x)
         {
             return x.MatchCallOrCallvirt(typeof(Physics), nameof(Physics.Raycast));
         }
 
-        static void replaceRaycastManipulator(ILContext il)
+        private static void replaceRaycastManipulator(ILContext il)
         {
             ILCursor c = new ILCursor(il);
 

@@ -2,6 +2,8 @@
 
 * Fixed Engineer's Laser Cutter skill not being able to hit allies, added config option to restore the previous behavior.
 
+* Reduced average mod load time by ~60%
+
 **1.2.4 Changes:**
 
 * Fixed 99% load screen crash compatibility issue

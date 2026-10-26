@@ -96,10 +96,13 @@ namespace NoAllyAttackBlock.Patches
             for (int i = unverifiedMethods.Count - 1; i >= 0; i--)
             {
                 MethodInfo unverifiedMethod = unverifiedMethods[i];
+                bool shouldApplyPatch = false;
                 try
                 {
                     _ = unverifiedMethod.DeclaringType;
                     _ = unverifiedMethod.GetMethodBody();
+
+                    shouldApplyPatch = shouldApplyRaycastManipulatorPatch(unverifiedMethod);
                 }
                 catch (Exception)
                 {
@@ -108,7 +111,7 @@ namespace NoAllyAttackBlock.Patches
                 }
 
                 // This method used to throw an exception when accessed (likely due to a missing assembly reference), but now it did, check if we should be patching it.
-                if (shouldApplyRaycastManipulatorPatch(unverifiedMethod))
+                if (shouldApplyPatch)
                 {
                     // We should patch it!
                     methodsToPatch.Add(unverifiedMethod);

@@ -1,7 +1,7 @@
 ﻿{
 	"name": "NoAllyAttackBlock",
 	"author": "Gorakh",
-	"version_number": "1.2.5",
+	"version_number": "1.2.6",
 	"website_url": "https://github.com/Goorakh/NoAllyAttackBlock",
 	"description": "Makes attacks not collide with your allies",
 	"dependencies": [

@@ -129,7 +129,7 @@ namespace NoAllyAttackBlock.Patches
                 }
                 catch (Exception e)
                 {
-                    Log.Info_NoCallerPrefix($"Failed to resolve patch target {methodToPatch.DeclaringType.FullName}.{methodToPatch.Name} ({assembly.FullName}): {e}");
+                    Log.Info_NoCallerPrefix($"Failed to resolve patch target {methodToPatch.Name} ({assembly.FullName}): {e}");
 
                     // This method no longer resolves, add it back into the unverified list and update the cache
                     unverifiedMethods.Add(methodToPatch);
